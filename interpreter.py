@@ -7,6 +7,8 @@ import sys
 
 # LEX
 keywords = (
+    'I', 'HAZ', 'A',
+    'R',
     'SUM', 'OF', 'AN',
     'VISIBLE',
 )
@@ -14,7 +16,8 @@ keywords = (
 tokens = keywords + (
      'NUMBER',
      'NEWLINE',
-     'ID'
+     'ID',
+     'VARIABLE'
 )
 
 t_ignore = ' \t'
@@ -23,6 +26,8 @@ def t_ID(t):
     r'[a-zA-Z_][a-zA-Z0-9_]*'
     if t.value in keywords:
         t.type = t.value
+    else:
+        t.type = 'VARIABLE'
     return t
 
 def t_NUMBER(t):
@@ -61,9 +66,22 @@ def p_program(p):
         if statement:
             p[0].append(statement)
 
+
+def p_statement_newline(p):
+    '''statement : NEWLINE'''
+    pass
+
 def p_statement(p):
     'statement : command NEWLINE'
     p[0] = p[1]
+
+def p_command_declare(p):
+    'command : I HAZ A VARIABLE'
+    variables[p[4]] = 'NOOB'
+
+def p_statement_assign(p):
+    'statement : VARIABLE R expression'
+    variables[p[1]] = p[3]
 
 def p_command_visible(p):
     '''command : VISIBLE expression'''
@@ -78,9 +96,12 @@ def p_expression_number(p):
     '''expression : NUMBER'''
     p[0] = p[1]
 
+def p_expression_variable(p):
+    '''expression : VARIABLE'''
+    p[0] = variables[p[1]]
+
 def p_error(p):
-    print('error', p)
-    print "SYNTAX ERROR AT EOF"
+    print "SYNTAX ERROR AT TOKEN %s" % p
 
 
 parser = yacc.yacc()
@@ -93,14 +114,11 @@ def eval(p):
     else:
         raise RuntimeError('Unknown operation %s' % (p))
 
-# If a filename has been specified, we try to run it.
-# If a runtime error occurs, we bail out and enter
-# interactive mode below
-
 if len(sys.argv) == 2:
     parser.error = 0
 
     data = open(sys.argv[1]).read()
     print('Parsing and interpreting')
     prog = parser.parse(data)
+    print(prog)
     if not prog: raise SystemExit

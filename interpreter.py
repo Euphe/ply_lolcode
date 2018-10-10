@@ -7,17 +7,20 @@ import sys
 
 # LEX
 keywords = (
-    'I', 'HAZ', 'A',
-    'R',
-    'SUM', 'OF', 'AN',
+    'I', 'HAZ', 'A', 'R', 'ITZ',
+    'SUM', 'DIFF', 'PRODUKT', 'QUOSHUNT', 'MOD', 'BIGGR', 'SMALLR', 'BOTH', 'WON', 'EITHER', 'SAEM', 'DIFFRINT', 'ALL', 'ANY',
+    'OF', 'AN', 'IT',
+    'NOOB', 'WIN', 'FAIL',
+    'NOT',
     'VISIBLE',
 )
 
 tokens = keywords + (
-     'NUMBER',
      'NEWLINE',
      'ID',
-     'VARIABLE'
+     'VARIABLE',
+     'INT', 'FLOAT', 'STRING',
+     'MINUS',
 )
 
 t_ignore = ' \t'
@@ -30,9 +33,21 @@ def t_ID(t):
         t.type = 'VARIABLE'
     return t
 
-def t_NUMBER(t):
+t_MINUS = r'-'
+
+def t_FLOAT(t):
+    r'\d+\.\d+'
+    t.value = float(t.value)
+    return t
+
+def t_INT(t):
     r'\d+'
-    t.value = int(t.value)    
+    t.value = int(t.value)
+    return t
+
+def t_STRING(t):
+    r'\".*?\"'
+    t.value = t.value[1:-1]
     return t
 
 def t_NEWLINE(t):
@@ -51,8 +66,8 @@ lex.lex(debug=1)
 variables = { }
 
 def p_program(p):
-    '''program : program statement
-               | statement
+    '''program : program statement empty
+               | statement empty
     '''
     if len(p) == 2 and p[1]:
         statement = p[1]
@@ -83,36 +98,133 @@ def p_statement_assign(p):
     'statement : VARIABLE R expression'
     variables[p[1]] = p[3]
 
+def p_statement_declare_assign(p):
+    'statement : I HAZ A VARIABLE ITZ expression'
+    variables[p[4]] = p[6]
+
 def p_command_visible(p):
     '''command : VISIBLE expression'''
-    p[0] = ('PRINT', p[2])
-    eval(p[0])
+    print p[2]
 
-def p_expression_sum(p):
-    '''expression : SUM OF expression AN expression'''
-    p[0] = p[3] + p[5]
+def p_expression_binop_both_same(p):
+    ''' expression : BOTH SAEM expression expression'''
+    p[0] = binop('BOTH SAEM', p[4], p[5])
 
-def p_expression_number(p):
-    '''expression : NUMBER'''
+def p_expression_binop_different(p):
+    ''' expression : DIFFRINT expression expression'''
+    p[0] = binop(p[1], p[2], p[3])
+
+def p_expression_binop(p):
+    ''' expression  : SUM OF expression expression
+                    | DIFF OF expression expression
+                    | PRODUKT OF expression expression
+                    | QUOSHUNT OF expression expression
+                    | MOD OF expression expression
+                    | BOTH OF expression expression
+                    | EITHER OF expression expression
+                    | WON OF expression expression
+                    | SMALLR OF expression expression
+                    | BIGGR OF expression expression
+    '''
+    p[0] = binop(p[1], p[3], p[4])
+
+def p_expression_binop_an(p):
+    ''' expression  : SUM OF expression AN expression
+                    | DIFF OF expression AN expression
+                    | PRODUKT OF expression AN expression
+                    | QUOSHUNT OF expression AN expression
+                    | MOD OF expression AN expression
+                    | BOTH OF expression AN expression
+                    | EITHER OF expression AN expression
+                    | WON OF expression AN expression
+                    | SMALLR OF expression AN expression
+                    | BIGGR OF expression AN expression
+    '''
+    p[0] = binop(p[1], p[3], p[5])
+
+def p_expression_unary_op(p):
+    ''' expression : MINUS expression
+                   | NOT expression
+    '''
+    p[0] = unary_op(p[1], p[2])
+
+def p_expression_troof(p):
+    '''expression : WIN
+                  | FAIL'''
+    p[0] = p[1]
+
+def p_expression_int(p):
+    '''expression : INT'''
+    p[0] = p[1]
+
+def p_expression_float(p):
+    '''expression : FLOAT'''
+    p[0] = p[1]
+
+def p_expression_string(p):
+    '''expression : STRING'''
     p[0] = p[1]
 
 def p_expression_variable(p):
     '''expression : VARIABLE'''
     p[0] = variables[p[1]]
 
+def p_empty(p):
+    ''' empty : '''
+
+def p_empty_newline(p):
+    ''' empty : NEWLINE'''
+
 def p_error(p):
     print "SYNTAX ERROR AT TOKEN %s" % p
 
-
 parser = yacc.yacc()
 
-# Evaluation
-def eval(p):
-    #print('eval', p)
-    if p[0] == 'PRINT':
-        print(p[1])
-    else:
-        raise RuntimeError('Unknown operation %s' % (p))
+def from_lolcode_type(x):
+    if x == 'FAIL':
+        return False
+    elif x == 'WIN':
+        return True
+    elif x == 'NOOB':
+        return None
+    return x
+
+def to_lolcode_type(x):
+    if x is False:
+        return 'FAIL'
+    elif x is True:
+        return 'WIN'
+    elif x is None:
+        return 'NOOB'
+    return x
+
+def unary_op(op, x):
+    x = from_lolcode_type(x)
+    ops = {
+        'NOT': lambda x: not x,
+        '-': lambda x: -x,
+    }
+    return to_lolcode_type(ops[op](x))
+
+def binop(op, x, y):
+    x = from_lolcode_type(x)
+    y = from_lolcode_type(y)
+    binops = {
+        'SUM': lambda x, y: x + y,
+        'DIFF': lambda x, y: x - y,
+        'PRODUKT': lambda x, y: x * y,
+        'QUOSHUNT': lambda x, y: x / y,
+        'MOD': lambda x, y: x % y,
+        'BIGGR': lambda x, y: max(x, y),
+        'SMALLR': lambda x, y: min(x, y),
+        'BOTH SAEM': lambda x, y: x == y,
+        'DIFFRINT': lambda x, y: x != y,
+        'EITHER': lambda x, y: x or y,
+        'BOTH': lambda x, y: x and y,
+        'WON': lambda x, y: not (x == y),
+    }
+    return to_lolcode_type(binops[op](x, y))
+
 
 if len(sys.argv) == 2:
     parser.error = 0
@@ -120,5 +232,4 @@ if len(sys.argv) == 2:
     data = open(sys.argv[1]).read()
     print('Parsing and interpreting')
     prog = parser.parse(data)
-    print(prog)
-    if not prog: raise SystemExit
+

@@ -12,6 +12,7 @@ keywords = (
     'OF', 'AN', 'IT',
     'NOOB', 'WIN', 'FAIL',
     'NOT',
+    'O', 'RLY', 'YA', 'NO', 'WAI', 'OIC',
     'VISIBLE',
 )
 
@@ -23,7 +24,9 @@ tokens = keywords + (
      'MINUS',
 )
 
-t_ignore = ' \t'
+t_RLY = 'RLY?'
+t_MINUS = '-'
+t_ignore = ' \t?'
 
 def t_ID(t):
     r'[a-zA-Z_][a-zA-Z0-9_]*'
@@ -33,7 +36,7 @@ def t_ID(t):
         t.type = 'VARIABLE'
     return t
 
-t_MINUS = r'-'
+
 
 def t_FLOAT(t):
     r'\d+\.\d+'
@@ -67,24 +70,34 @@ variables = { }
 
 def p_program(p):
     '''program : program statement empty
-               | statement empty
+               | construct empty
     '''
     if len(p) == 2 and p[1]:
         statement = p[1]
         p[0] = [statement]
     elif len(p) ==3:
         program = p[1]
-        statement = p[2]
+        construct = p[2]
         p[0] = []
         if program:
             p[0].append(program)
-        if statement:
-            p[0].append(statement)
+        if construct:
+            p[0].append(construct)
 
+def p_construct(p):
+    '''construct : construct statement
+                 | statement
+    '''
+
+def p_construct_if(p):
+    'construct : expression NEWLINE O RLY NEWLINE YA RLY NEWLINE construct NO WAI NEWLINE construct OIC'
+    condition = p[1]
+    branch_one = p[9]
+    branch_two = p[13]
 
 def p_statement_newline(p):
-    '''statement : NEWLINE'''
-    pass
+    'statement : NEWLINE'
+    p[0] = None
 
 def p_statement(p):
     'statement : command NEWLINE'
@@ -104,15 +117,26 @@ def p_statement_declare_assign(p):
 
 def p_command_visible(p):
     '''command : VISIBLE expression'''
-    print p[2]
+    #print p[2]
+    p[0] = ('VISIBLE', p[2])
 
 def p_expression_binop_both_same(p):
-    ''' expression : BOTH SAEM expression expression'''
-    p[0] = binop('BOTH SAEM', p[4], p[5])
+    ''' expression : BOTH SAEM expression expression
+                   | BOTH SAEM expression AN expression
+    '''
+    if len(p) == 4:
+        p[0] = binop('BOTH SAEM', p[4], p[5])
+    elif len(p) == 5:
+        p[0] = binop('BOTH SAEM', p[4], p[6])
 
 def p_expression_binop_different(p):
-    ''' expression : DIFFRINT expression expression'''
-    p[0] = binop(p[1], p[2], p[3])
+    ''' expression : DIFFRINT expression expression
+                   | DIFFRINT expression AN expression
+    '''
+    if len(p) == 4:
+        p[0] = binop(p[1], p[2], p[3])
+    elif len(p) == 5:
+        p[0] = binop(p[1], p[2], p[4])
 
 def p_expression_binop(p):
     ''' expression  : SUM OF expression expression
@@ -148,21 +172,13 @@ def p_expression_unary_op(p):
     '''
     p[0] = unary_op(p[1], p[2])
 
-def p_expression_troof(p):
+def p_expression_type(p):
     '''expression : WIN
-                  | FAIL'''
-    p[0] = p[1]
-
-def p_expression_int(p):
-    '''expression : INT'''
-    p[0] = p[1]
-
-def p_expression_float(p):
-    '''expression : FLOAT'''
-    p[0] = p[1]
-
-def p_expression_string(p):
-    '''expression : STRING'''
+                  | FAIL
+                  | INT
+                  | FLOAT
+                  | STRING
+   '''
     p[0] = p[1]
 
 def p_expression_variable(p):
@@ -228,7 +244,6 @@ def binop(op, x, y):
 
 if len(sys.argv) == 2:
     parser.error = 0
-
     data = open(sys.argv[1]).read()
     print('Parsing and interpreting')
     prog = parser.parse(data)

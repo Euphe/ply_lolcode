@@ -68,6 +68,8 @@ lex.lex(debug=1)
 
 variables = { }
 
+cur_line = 0
+
 def p_program(p):
     '''program : program construct empty
                | construct empty
@@ -87,10 +89,16 @@ def p_construct(p):
             p[0] = (p[0] or []) + p[1] 
         if isinstance(p[1], tuple):
             p[0] = [p[1]]
+        construct = p[1]
+        # We reach this point if a construct has been maximally reduced to a list of statements
+        # Thus we execute each statement, but only if it's on a line after the current line number
+        if construct and isinstance(construct, list):
+            for st in construct:
+                if st[0] > cur_line:
+                    eval(st)
     elif len(p) == 3 and p[2]:
         p[0] = p[1] or []
         p[0] = p[0] + [p[2]]
-
 
 def p_construct_if(p):
     'construct : expression NEWLINE O RLY NEWLINE YA RLY NEWLINE construct NO WAI NEWLINE construct OIC'
@@ -109,7 +117,6 @@ def p_statement_newline(p):
 def p_statement(p):
     'statement : command NEWLINE'
     p[0] = p[1]
-    eval(p[0])
 
 def p_command_declare(p):
     'command : I HAZ A VARIABLE'
@@ -125,7 +132,7 @@ def p_statement_declare_assign(p):
 
 def p_command_visible(p):
     '''command : VISIBLE expression'''
-    p[0] = ('VISIBLE', p[2])
+    p[0] = (p.lineno(1), 'VISIBLE', p[2])
 
 def p_expression_binop_both_same(p):
     ''' expression : BOTH SAEM expression expression
@@ -230,12 +237,18 @@ def unary_op(op, x):
     return to_lolcode_type(ops[op](x))
 
 def eval(p):
+    global cur_line
     if not p:
         return
-    #print 'eval p %s' % str([ x for x in p])
-    op = p[0]
+    lineno = p[0]
+    if lineno < cur_line:
+        raise(Exception('What? You are at line %s' % cur_line))
+    op = p[1]
+    arg = p[2]
     if op == 'VISIBLE':
-        print(p[1]) 
+        print(arg) 
+
+    cur_line = lineno
 
 def binop(op, x, y):
     x = from_lolcode_type(x)

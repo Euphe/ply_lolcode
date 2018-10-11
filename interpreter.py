@@ -69,31 +69,38 @@ lex.lex(debug=1)
 variables = { }
 
 def p_program(p):
-    '''program : program statement empty
+    '''program : program construct empty
                | construct empty
     '''
-    if len(p) == 2 and p[1]:
-        statement = p[1]
-        p[0] = [statement]
-    elif len(p) ==3:
-        program = p[1]
-        construct = p[2]
-        p[0] = []
-        if program:
-            p[0].append(program)
-        if construct:
-            p[0].append(construct)
+    if len(p) == 3:
+        construct = p[1]
+        p[0] = construct
+    elif len(p) == 4:
+        p[0] = p[1] + p[2]
 
 def p_construct(p):
     '''construct : construct statement
                  | statement
     '''
+    if len(p) == 2 or len(p) == 3 and not p[2]:
+        if isinstance(p[1], list):
+            p[0] = (p[0] or []) + p[1] 
+        if isinstance(p[1], tuple):
+            p[0] = [p[1]]
+    elif len(p) == 3 and p[2]:
+        p[0] = p[1] or []
+        p[0] = p[0] + [p[2]]
+
 
 def p_construct_if(p):
     'construct : expression NEWLINE O RLY NEWLINE YA RLY NEWLINE construct NO WAI NEWLINE construct OIC'
     condition = p[1]
     branch_one = p[9]
     branch_two = p[13]
+    if condition:
+        p[0] = branch_one
+    else:
+        p[0] = branch_two
 
 def p_statement_newline(p):
     'statement : NEWLINE'
@@ -102,6 +109,7 @@ def p_statement_newline(p):
 def p_statement(p):
     'statement : command NEWLINE'
     p[0] = p[1]
+    eval(p[0])
 
 def p_command_declare(p):
     'command : I HAZ A VARIABLE'
@@ -117,7 +125,6 @@ def p_statement_declare_assign(p):
 
 def p_command_visible(p):
     '''command : VISIBLE expression'''
-    #print p[2]
     p[0] = ('VISIBLE', p[2])
 
 def p_expression_binop_both_same(p):
@@ -222,6 +229,14 @@ def unary_op(op, x):
     }
     return to_lolcode_type(ops[op](x))
 
+def eval(p):
+    if not p:
+        return
+    #print 'eval p %s' % str([ x for x in p])
+    op = p[0]
+    if op == 'VISIBLE':
+        print(p[1]) 
+
 def binop(op, x, y):
     x = from_lolcode_type(x)
     y = from_lolcode_type(y)
@@ -247,4 +262,4 @@ if len(sys.argv) == 2:
     data = open(sys.argv[1]).read()
     print('Parsing and interpreting')
     prog = parser.parse(data)
-
+    print('Final program', prog)

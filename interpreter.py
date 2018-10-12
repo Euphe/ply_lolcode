@@ -23,11 +23,18 @@ tokens = keywords + (
      'VARIABLE',
      'INT', 'FLOAT', 'STRING',
      'MINUS',
+     'COMMENT', 'MULTILINE_COMMENT'
 )
 
 t_RLY = 'RLY?'
 t_MINUS = '-'
 t_ignore = ' \t?'
+
+def t_COMMENT(t):
+    r'BTW .+'
+
+def t_MULTILINE_COMMENT(t):
+    r'OBTW(.|[\r\n])*?TLDR'
 
 def t_ID(t):
     r'[a-zA-Z_][a-zA-Z0-9_]*'

@@ -7,7 +7,8 @@ import sys
 
 # LEX
 keywords = (
-    'I', 'HAZ', 'A', 'R', 'ITZ',
+    'HAI', 'KTHXBYE',
+    'I', 'HAS', 'A', 'R', 'ITZ',
     'SUM', 'DIFF', 'PRODUKT', 'QUOSHUNT', 'MOD', 'BIGGR', 'SMALLR', 'BOTH', 'WON', 'EITHER', 'SAEM', 'DIFFRINT', 'ALL', 'ANY',
     'OF', 'AN', 'IT',
     'NOOB', 'WIN', 'FAIL',
@@ -35,8 +36,6 @@ def t_ID(t):
     else:
         t.type = 'VARIABLE'
     return t
-
-
 
 def t_FLOAT(t):
     r'\d+\.\d+'
@@ -66,9 +65,16 @@ lex.lex(debug=1)
 
 # Parsing rules
 
+precedence = (('left','SUM','DIFF'),('left','PRODUKT','QUOSHUNT'),('right', 'MINUS'),)
+
 variables = { }
 
 cur_line = 0
+
+def p_file(p):
+    '''file : HAI FLOAT NEWLINE program KTHXBYE
+            | HAI FLOAT NEWLINE program KTHXBYE NEWLINE'''
+    p[0] = p[4]
 
 def p_program(p):
     '''program : program construct empty
@@ -90,6 +96,7 @@ def p_construct(p):
         if isinstance(p[1], tuple):
             p[0] = [p[1]]
         construct = p[1]
+
         # We reach this point if a construct has been maximally reduced to a list of statements
         # Thus we execute each statement, but only if it's on a line after the current line number
         if construct and isinstance(construct, list):
@@ -101,7 +108,7 @@ def p_construct(p):
         p[0] = p[0] + [p[2]]
 
 def p_construct_if(p):
-    'construct : expression NEWLINE O RLY NEWLINE YA RLY NEWLINE construct NO WAI NEWLINE construct OIC'
+    'construct : expression NEWLINE O RLY NEWLINE YA RLY NEWLINE construct NO WAI NEWLINE construct OIC NEWLINE'
     condition = p[1]
     branch_one = p[9]
     branch_two = p[13]
@@ -119,7 +126,7 @@ def p_statement(p):
     p[0] = p[1]
 
 def p_command_declare(p):
-    'command : I HAZ A VARIABLE'
+    'command : I HAS A VARIABLE'
     variables[p[4]] = 'NOOB'
 
 def p_statement_assign(p):
@@ -127,7 +134,7 @@ def p_statement_assign(p):
     variables[p[1]] = p[3]
 
 def p_statement_declare_assign(p):
-    'statement : I HAZ A VARIABLE ITZ expression'
+    'statement : I HAS A VARIABLE ITZ expression'
     variables[p[4]] = p[6]
 
 def p_command_visible(p):
@@ -201,9 +208,11 @@ def p_expression_variable(p):
 
 def p_empty(p):
     ''' empty : '''
+    p[0] = None
 
-def p_empty_newline(p):
-    ''' empty : NEWLINE'''
+#def p_empty_newline(p):
+#    ''' empty : NEWLINE'''
+#    p[0] = None
 
 def p_error(p):
     print "SYNTAX ERROR AT TOKEN %s" % p

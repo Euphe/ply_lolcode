@@ -15,6 +15,8 @@ keywords = (
     'NOT',
     'O', 'RLY', 'YA', 'NO', 'WAI', 'OIC', 'MEBBE',
     'VISIBLE', 'GIMMEH',
+    'MAEK',
+    'NUMBAR', 'YARN', 'TROOF', 'NUMBR',
 )
 
 tokens = keywords + (
@@ -23,7 +25,7 @@ tokens = keywords + (
      'VARIABLE',
      'INT', 'FLOAT', 'STRING',
      'MINUS',
-     'COMMENT', 'MULTILINE_COMMENT'
+     'COMMENT', 'MULTILINE_COMMENT',
 )
 
 t_MINUS = '-'
@@ -200,6 +202,11 @@ def p_command_gimmeh(p):
     'command : GIMMEH VARIABLE'
     p[0] = (p.lineno(1), 'GIMMEH', p[2])
 
+
+def p_expression_cast(p):
+    'expression : MAEK expression A type'
+    p[0] = (p.lineno(1), 'CAST', p[2], p[4])
+
 def p_expression_binop_both_same(p):
     ''' expression : BOTH SAEM expression expression
                    | BOTH SAEM expression AN expression
@@ -252,6 +259,20 @@ def p_expression_unary_op(p):
     '''
     p[0] = (p.lineno(1), 'UNARY', p[1], p[2])
 
+
+def p_expression_type(p):
+    'expression : type'
+    p[0] = p[1]
+
+def p_type(p):
+    '''type : YARN
+          | NUMBR
+          | NUMBAR
+          | TROOF
+          | NOOB
+    '''
+    p[0] = p[1]
+
 def p_expression_int(p):
     'expression : INT'
     p[0] = (p.lineno(1), 'INT', p[1])
@@ -298,6 +319,18 @@ def format_lolcode_string(text):
     # Todo unicode code points
     # Todo variable substitution
     return text
+
+def cast(item, to_type):
+    if to_type == 'TROOF':
+        return bool(item)
+    elif to_type == 'NUMBR':
+        return int(item)
+    elif to_type == 'NUMBAR':
+        return float(item)
+    elif to_type == 'YARN':
+        return str(item)
+    elif to_type == 'NOOB':
+        return None
 
 def from_lolcode_type(x):
     if x == 'FAIL':
@@ -382,6 +415,10 @@ def eval(p):
                     break
             else:
                 eval_construct(else_construct)
+    elif op == 'CAST':
+        expr = eval(p[2])
+        to_type = eval(p[3])
+        return cast(expr, to_type)
     else:
         raise(Exception('Unknown operation: ' +str(p)))
 

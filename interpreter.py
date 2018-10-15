@@ -15,7 +15,7 @@ keywords = (
     'NOT',
     'O', 'RLY', 'YA', 'NO', 'WAI', 'OIC', 'MEBBE',
     'VISIBLE', 'GIMMEH',
-    'MAEK',
+    'MAEK', 'IS', 'NOW',
     'NUMBAR', 'YARN', 'TROOF', 'NUMBR',
 )
 
@@ -203,6 +203,10 @@ def p_command_gimmeh(p):
     p[0] = (p.lineno(1), 'GIMMEH', p[2])
 
 
+def p_command_cast_var(p):
+    'command : VARIABLE IS NOW A type'
+    p[0] = (p.lineno(1), 'ASSIGN', p[1], ( p.lineno(1), 'CAST', ( p.lineno(1), 'VAR', p[1] ), p[5]))
+
 def p_expression_cast(p):
     'expression : MAEK expression A type'
     p[0] = (p.lineno(1), 'CAST', p[2], p[4])
@@ -318,7 +322,7 @@ def format_lolcode_string(text):
             .replace('::', ':')
     # Todo unicode code points
     # Todo variable substitution
-    return text
+    return '"{}"'.format(text)
 
 def cast(item, to_type):
     if to_type == 'TROOF':
@@ -384,7 +388,8 @@ def eval(p):
         text = eval(arg)
         if isinstance(text, str):
             text = format_lolcode_string(text)
-        text = to_lolcode_type(text)
+        else:
+            text = to_lolcode_type(text)
         print(text)
     elif op == 'GIMMEH':
         varname = eval(arg)

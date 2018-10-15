@@ -14,7 +14,7 @@ keywords = (
     'NOOB', 'WIN', 'FAIL',
     'NOT',
     'O', 'RLY', 'YA', 'NO', 'WAI', 'OIC', 'MEBBE',
-    'VISIBLE',
+    'VISIBLE', 'GIMMEH',
 )
 
 tokens = keywords + (
@@ -109,8 +109,9 @@ def p_program(p):
                 p[0] = p[1] + (p[2] or [])
 
 def p_construct(p):
-    '''construct : construct empty construct
+    '''construct : construct NEWLINE construct
                  | statement empty
+                 | empty
     '''
     if len(p) == 3 or len(p) == 4 and not p[3]:
         if isinstance(p[1], list):
@@ -121,7 +122,7 @@ def p_construct(p):
         if isinstance(p[1], tuple):
             p[1] = [p[1]]
         if isinstance(p[3], tuple):
-            p[3] = [p3]
+            p[3] = [p[3]]
         p[0] = p[1] or []
         if not p[3] in p[0]:
             p[0] = p[0] + p[3]
@@ -147,22 +148,33 @@ def p_construct_if_elif(p):
     else_ = p[14]
     p[0] = (p.lineno(2), 'IF', condition, if_true, elif_blocks, else_)
 
-def p_elif(p):
+
+def p_elifs(p):
     '''
     elifs : elif
           | elifs elif
     '''
+
     if len(p) == 2 and p[1]:
         p[0] = [p[1]]
     elif len(p) == 3:
         p[0] = p[1] + [p[2]]
 
 
-def p_elifs(p):
+def p_elif(p):
     '''
     elif : MEBBE expression NEWLINE construct
     '''
     p[0] = (p.lineno(1), 'ELIF', p[2], p[4])
+
+
+def p_statement_comment(p):
+    'statement : COMMENT NEWLINE'
+    p[0] = None
+
+def p_statement_multiline_comment(p):
+    'statement : MULTILINE_COMMENT NEWLINE'
+    p[0] = None
 
 def p_statement(p):
     'statement : command NEWLINE'
@@ -183,6 +195,10 @@ def p_command_declare_assign(p):
 def p_command_visible(p):
     'command : VISIBLE expression'
     p[0] = (p.lineno(1), 'VISIBLE', p[2])
+
+def p_command_gimmeh(p):
+    'command : GIMMEH VARIABLE'
+    p[0] = (p.lineno(1), 'GIMMEH', p[2])
 
 def p_expression_binop_both_same(p):
     ''' expression : BOTH SAEM expression expression
@@ -310,7 +326,7 @@ def unary_op(op, x):
     return ops[op](x)
 
 def eval_construct(construct):
-    for st in construct:
+    for st in sorted(construct, key=lambda st: st[0]):
         if st[0] > cur_line:
             eval(st)
 
@@ -318,7 +334,6 @@ def eval(p):
     global cur_line
     if not p:
         return
-    # print('eval', p)
     if not isinstance(p, tuple):
         return p
     lineno = p[0]
@@ -338,6 +353,12 @@ def eval(p):
             text = format_lolcode_string(text)
         text = to_lolcode_type(text)
         print(text)
+    elif op == 'GIMMEH':
+        varname = eval(arg)
+        val = input('Please input value for variable {} '.format(varname))
+        if not varname in variables:
+            raise(Exception('Undefined variable ' + varname))
+        variables[varname] = val
     elif op == 'BINOP':
         operation = p[2]
         x = eval(p[3])
@@ -350,14 +371,17 @@ def eval(p):
     elif op == 'IF':
         expr = eval(p[2])
         if_true_construct = p[3]
-        elifs = p[4]
+        elifs = p[4] or []
         else_construct = p[5]
         if expr and if_true_construct:
             eval_construct(if_true_construct)
         else:
-            eval_construct(else_construct)
-
-
+            for elif_block in elifs:
+                if eval(elif_block[2]):
+                    eval_construct(elif_block[3])
+                    break
+            else:
+                eval_construct(else_construct)
     else:
         raise(Exception('Unknown operation: ' +str(p)))
 

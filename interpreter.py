@@ -18,6 +18,7 @@ keywords = (
     'MAEK', 'IS', 'NOW',
     'NUMBAR', 'YARN', 'TROOF', 'NUMBR',
     'WTF', 'OMG', 'OMGWTF', 'GTFO',
+    'AM', 'IN', 'YR', 'TIL', 'WILE', 'UPPIN', 'NERFIN', 'OUTTA', 'IM', 
 )
 
 tokens = keywords + (
@@ -27,6 +28,7 @@ tokens = keywords + (
      'INT', 'FLOAT', 'STRING',
      'MINUS',
      'COMMENT', 'MULTILINE_COMMENT',
+     'LABEL',
 )
 
 t_MINUS = '-'
@@ -56,6 +58,9 @@ def t_INT(t):
     t.value = int(t.value)
     return t
 
+def t_LABEL(t):
+    r'\w+'
+    return t
 
 def t_STRING(t):
     r'\".*?\"'
@@ -78,6 +83,9 @@ lex.lex(debug=1)
 precedence = (('left','SUM','DIFF'),('left','PRODUKT','QUOSHUNT'),('right', 'MINUS'),)
 
 variables = { }
+
+loops = [] # a stack of loops
+break_loop = False
 
 cur_line = 0
 
@@ -205,6 +213,22 @@ def p_construct_omgwtf(p):
     else:
         p[0] = (p.lineno(1), 'OMGWTF', p[3]) 
 
+def p_loop(p):
+    '''construct : IM IN YR VARIABLE operation YR VARIABLE loop_condition NEWLINE construct IM OUTTA YR VARIABLE
+                 | IM IN YR VARIABLE operation YR VARIABLE NEWLINE construct IM OUTTA YR VARIABLE'''
+    if len(p) == 14:
+        p[0] = (p.lineno(1), 'LOOP', p[4], p[5], p[7], None, p[9])
+    else:
+        p[0] = (p.lineno(1), 'LOOP', p[4], p[5], p[7], p[8], p[10])
+
+def p_loop_condition(p):
+    '''loop_condition : TIL expression
+                      | WILE expression'''
+    if len(p) == 2:
+        p[0] = None
+    else:
+        p[0] = (p[1], p[2])
+
 def p_statement_comment(p):
     'statement : COMMENT NEWLINE'
     p[0] = None
@@ -216,6 +240,10 @@ def p_statement_multiline_comment(p):
 def p_statement(p):
     'statement : command NEWLINE'
     p[0] = p[1]
+
+def p_command_gtfo(p):
+    'command : GTFO'
+    p[0] = (p.lineno(1), 'GTFO')
 
 def p_command_declare(p):
     'command : I HAS A VARIABLE'
@@ -250,10 +278,10 @@ def p_expression_binop_both_same(p):
     ''' expression : BOTH SAEM expression expression
                    | BOTH SAEM expression AN expression
     '''
-    if len(p) == 4:
-        p[0] = (p.lineno(1), 'BINOP', 'BOTH SAEM', p[4], p[5])
-    elif len(p) == 5:
-        p[0] = (p.lineno(1), 'BINOP', 'BOTH SAEM', p[4], p[6])
+    if len(p) == 5:
+        p[0] = (p.lineno(1), 'BINOP', 'BOTH SAEM', p[3], p[4])
+    elif len(p) == 6:
+        p[0] = (p.lineno(1), 'BINOP', 'BOTH SAEM', p[3], p[5])
 
 def p_expression_binop_different(p):
     ''' expression : DIFFRINT expression expression
@@ -337,6 +365,12 @@ def p_literal_false(p):
     'literal : FAIL'
     p[0] = (p.lineno(1), 'FAIL', False)
 
+def p_operation(p):
+    '''operation : UPPIN
+                 | NERFIN
+    '''
+    p[0] = p[1]
+
 def p_expression_variable(p):
     '''expression : VARIABLE'''
     p[0] = (p.lineno(1), 'VAR', p[1])
@@ -399,41 +433,44 @@ def unary_op(op, x):
     ops = {
         'NOT': lambda x: not x,
         '-': lambda x: -x,
+        'UPPIN': lambda x: x+1,
+        'NERFIN': lambda x: x-1,
     }
     return ops[op](x)
 
 def eval_construct(construct):
     for st in sorted(construct, key=lambda st: st[0]):
+        if break_loop:
+            break
         if st[0] > cur_line:
             eval(st)
 
 def eval(p):
     global cur_line
+    global break_loop
     if not p:
         return
     if not isinstance(p, tuple):
         return p
-    #print('eval', p)
     lineno = p[0]
     if lineno < cur_line:
         raise(Exception('What? You are at line ' + str(cur_line)))
     op = p[1]
-    arg = p[2]
     if op in ['INT', 'FLOAT', 'STRING', 'WIN', 'FAIL']:
         return p[2]
     elif op == 'VAR':
-        return variables[eval(arg)]
+        return variables[eval(p[2])]
     elif op in ['DECLARE', 'ASSIGN']:
-        variables[eval(arg)] = eval(p[3])
+        variables[eval(p[2])] = eval(p[3])
     elif op == 'VISIBLE':
-        text = eval(arg)
+        text = eval(p[2])
         if isinstance(text, str):
             text = format_lolcode_string(text)
         else:
             text = to_lolcode_type(text)
         print(text)
     elif op == 'GIMMEH':
-        varname = eval(arg)
+        varname = eval(p[2])
         val = input('Please input value for variable {} '.format(varname))
         if not varname in variables:
             raise(Exception('Undefined variable ' + varname))
@@ -488,6 +525,41 @@ def eval(p):
         if not match and omgwtf:
             construct = omgwtf[2]
             eval_construct(construct) 
+    elif op == 'LOOP':
+        def resolve_condition(condition):
+            # return 0 if break, 1 if continued
+            expression = condition[1]
+            res = eval(expression)
+            if (condition[0] == 'TIL' and res) or (condition[0] == 'WILE' and not res):
+                return 0
+            return 1
+
+        label = p[2]
+        operation = p[3]
+        temp_var_name = p[4]
+        condition = p[5]
+        construct = p[6]
+        variables[temp_var_name] = 0
+        i = 0
+        max_iters = 10**3
+        loops.append(label)
+        while (resolve_condition(condition) if condition else 1):
+            variables[temp_var_name] = unary_op(operation, variables[temp_var_name])
+            if construct:
+                eval_construct(construct)
+            if break_loop: # if GTFO was in construct
+                break
+            cur_line = p[0] 
+            i+=1
+            if i >= max_iters:
+                raise(Exception('Infinite loop'))
+        break_loop = False
+        loops.remove(label)
+        del variables[temp_var_name]
+    elif op == 'GTFO':
+        if not loops:
+            raise(Exception('GTFO outside of loop'))
+        break_loop = True
     elif op == 'CAST':
         expr = eval(p[2])
         to_type = eval(p[3])

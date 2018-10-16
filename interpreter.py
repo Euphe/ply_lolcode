@@ -17,6 +17,7 @@ keywords = (
     'VISIBLE', 'GIMMEH',
     'MAEK', 'IS', 'NOW',
     'NUMBAR', 'YARN', 'TROOF', 'NUMBR',
+    'WTF', 'OMG', 'OMGWTF', 'GTFO',
 )
 
 tokens = keywords + (
@@ -170,6 +171,40 @@ def p_elif(p):
     p[0] = (p.lineno(1), 'ELIF', p[2], p[4])
 
 
+def p_construct_case(p):
+    'construct : expression NEWLINE WTF NEWLINE omgs NEWLINE omgwtf OIC '
+    p[0] = (p.lineno(2), 'CASE', p[1], p[5], p[7])
+
+def p_construct_omgs(p):
+    '''omgs : omg
+            | omgs omg
+    '''
+    if len(p) == 2:
+        p[0] = [p[1]]
+    else:
+        if isinstance(p[2], tuple):
+            p[2] = [p[2]]
+        p[0] = p[1] + (p[2] or [])
+
+def p_construct_omg(p):
+    '''omg : OMG literal NEWLINE construct
+           | OMG literal NEWLINE construct GTFO 
+           | empty
+    '''
+    if len(p) == 2:
+        p[0] = None
+    else:
+        p[0] = (p.lineno(1), 'OMG', p[2], p[4], p[5] if len(p) >= 6 else None)
+
+def p_construct_omgwtf(p):
+    '''omgwtf : empty
+              | OMGWTF NEWLINE construct
+    '''
+    if len(p) == 2:
+        p[0] = None
+    else:
+        p[0] = (p.lineno(1), 'OMGWTF', p[3]) 
+
 def p_statement_comment(p):
     'statement : COMMENT NEWLINE'
     p[0] = None
@@ -268,6 +303,11 @@ def p_expression_type(p):
     'expression : type'
     p[0] = p[1]
 
+
+def p_expression_literal(p):
+    'expression : literal'
+    p[0] = p[1]
+
 def p_type(p):
     '''type : YARN
           | NUMBR
@@ -277,24 +317,24 @@ def p_type(p):
     '''
     p[0] = p[1]
 
-def p_expression_int(p):
-    'expression : INT'
+def p_literal_int(p):
+    'literal : INT'
     p[0] = (p.lineno(1), 'INT', p[1])
 
-def p_expression_float(p):
-    'expression : FLOAT'
+def p_literal_float(p):
+    'literal : FLOAT'
     p[0] = (p.lineno(1), 'FLOAT', p[1])
 
-def p_expression_string(p):
-    'expression : STRING'
+def p_literal_string(p):
+    'literal : STRING'
     p[0] = (p.lineno(1), 'STRING', p[1])
 
-def p_expression_true(p):
-    'expression : WIN'
+def p_literal_true(p):
+    'literal : WIN'
     p[0] = (p.lineno(1), 'WIN', True)
 
-def p_expression_false(p):
-    'expression : FAIL'
+def p_literal_false(p):
+    'literal : FAIL'
     p[0] = (p.lineno(1), 'FAIL', False)
 
 def p_expression_variable(p):
@@ -373,6 +413,7 @@ def eval(p):
         return
     if not isinstance(p, tuple):
         return p
+    #print('eval', p)
     lineno = p[0]
     if lineno < cur_line:
         raise(Exception('What? You are at line ' + str(cur_line)))
@@ -420,6 +461,33 @@ def eval(p):
                     break
             else:
                 eval_construct(else_construct)
+    elif op == 'CASE':
+        def _execute_blocks_until_break(i, omg_blocks):
+            block = omg_blocks[i]
+            construct, terminated =  block[3], block[4]
+            if construct:
+                eval_construct(construct)
+            if terminated or len(omg_blocks) < i+1:
+                return i
+            else:
+                next_block = omg_blocks[i+1]
+                return _execute_blocks_until_break(i+1, omg_blocks)
+
+        expr = eval(p[2])
+        omg_blocks = p[3]
+        omgwtf = p[4]
+        i = 0
+        match = False
+        while i < len(omg_blocks):
+            block = omg_blocks[i]
+            literal = eval(block[2])
+            if expr == literal:
+                match = True
+                i = _execute_blocks_until_break(i, omg_blocks)
+            i += 1
+        if not match and omgwtf:
+            construct = omgwtf[2]
+            eval_construct(construct) 
     elif op == 'CAST':
         expr = eval(p[2])
         to_type = eval(p[3])
